@@ -4,15 +4,15 @@ import com.example.clase6gtics.entity.Product;
 import com.example.clase6gtics.repository.CategoryRepository;
 import com.example.clase6gtics.repository.ProductRepository;
 import com.example.clase6gtics.repository.SupplierRepository;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import java.util.List;
 import java.util.Optional;
 
 @Controller
@@ -36,21 +36,48 @@ public class ProductController {
     }
 
     @GetMapping("/new")
-    public String nuevoProductoFrm(Model model) {
+    public String nuevoProductoFrm(Model model, @ModelAttribute("product") Product product) {
         model.addAttribute("listaCategorias", categoryRepository.findAll());
         model.addAttribute("listaProveedores", supplierRepository.findAll());
         return "product/newFrm";
     }
 
     @PostMapping("/save")
-    public String guardarProducto(Product product, RedirectAttributes attr) {
-        if (product.getId() == 0) {
-            attr.addFlashAttribute("msg", "Producto creado exitosamente");
-        } else {
-            attr.addFlashAttribute("msg", "Producto actualizado exitosamente");
+    public String guardarProducto(RedirectAttributes attr,
+                                  Model model,
+                                  @ModelAttribute("product") @Valid Product product,
+                                  BindingResult bindingResult) {
+
+        if(bindingResult.hasErrors()){
+            model.addAttribute("listaCategorias", categoryRepository.findAll());
+            model.addAttribute("listaProveedores", supplierRepository.findAll());
+            return "product/newFrm";
+        }else{
+            if (product.getId() == 0) {
+                List<Product> productList = productRepository.findByProductname(product.getProductname());
+                boolean existe = false;
+                for (Product p : productList) {
+                    if (p.getProductname().equals(product.getProductname())) {
+                        existe = true;
+                        break;
+                    }
+                }
+                if (existe) {
+                    System.out.println("El producto existe");
+                    model.addAttribute("listaCategorias", categoryRepository.findAll());
+                    model.addAttribute("listaProveedores", supplierRepository.findAll());
+                    return "product/newFrm";
+                } else {
+                    attr.addFlashAttribute("msg", "Producto creado exitosamente");
+                    productRepository.save(product);
+                    return "redirect:/product";
+                }
+            } else {
+                attr.addFlashAttribute("msg", "Producto actualizado exitosamente");
+                productRepository.save(product);
+                return "redirect:/product";
+            }
         }
-        productRepository.save(product);
-        return "redirect:/product";
     }
 
     @GetMapping("/edit")
@@ -63,7 +90,7 @@ public class ProductController {
             model.addAttribute("product", product);
             model.addAttribute("listaCategorias", categoryRepository.findAll());
             model.addAttribute("listaProveedores", supplierRepository.findAll());
-            return "product/editFrm";
+            return "product/newFrm";
         } else {
             return "redirect:/product";
         }
